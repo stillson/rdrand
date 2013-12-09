@@ -24,7 +24,13 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from random import Random
-from _rdrand import (rdrand_get_bits, rdrand_get_bytes)
+try:
+    from _rdrand import (rdrand_get_bits, rdrand_get_bytes)
+except SystemError as e:
+    print "This module requires a cpu which has a hardware" +\
+          " random number generator"
+    raise e
+
 
 class RdRandom(Random):
     """Alternate random number generator using intel's rdrand instructions

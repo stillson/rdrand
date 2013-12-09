@@ -218,7 +218,11 @@ init_rdrand(void)
 
         // I need to verify that cpu type can do rdrand
         if (RdRand_cpuid() != 1)
+        {
+            PyErr_SetString(PyExc_SystemError,
+                        "CPU doesn't have random number generator");
             return;
+        }
 
         m = Py_InitModule3("_rdrand", rdrand_functions, module_doc);
         if (m == NULL)
