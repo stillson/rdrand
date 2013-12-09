@@ -34,7 +34,7 @@ class RdRandom(Random):
 
     def random(self):
         """Get the next random number in the range [0.0, 1.0)."""
-        return (1.0 * rdrand_get_bits(54)) / (2 ** 54)
+        return (1.0 * rdrand_get_bits(52)) / (2 ** 52)
 
     def getrandbytes(self, k):
         if k <= 0:
