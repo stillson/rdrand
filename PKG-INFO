@@ -1,0 +1,23 @@
+Metadata-Version: 1.1
+Name: rdrand
+Version: 0.2.2
+Author: Chris Stillson
+Author-email: stillson at gmail com
+Home-page: https://github.com/stillson/rdrand
+Download-url: UNKNOWN
+Summary: Python interface to Intel hardware rng
+License: New BSD license
+Description: python random.Random() subclass which uses a c
+                 extension to use the Intel processor extension
+                 to access a real random number generator.
+
+        Requires a compiler to build. Tested with clang and gcc. Requires an Intel processor with the RDRAND instruction
+Keywords: random rng
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Programming Language :: Python :: 2
+Classifier: Topic :: Security
+Classifier: Topic :: Security :: Cryptography

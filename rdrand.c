@@ -87,15 +87,15 @@ get_bits(void)
     // to reexamine for future versions
     do
     {
-#ifdef __linux__
-        asm("rdrand %0;\n\t"
+#ifdef __GNUC__
+        //asm("rdrand %0;\n\t" "setc %1" :"=a"(rando),"=qm"(err));
+        asm volatile(".byte 0x48; .byte 0x0f; .byte 0xc7; .byte 0xf0; setc %1":"=a"(rando), "=qm"(err));
+
+#elif  __clang__
+        asm("rdrandq %0;\n\t" "setc %1" :"=a"(rando),"=qm"(err) : :);
 #else
-        asm("rdrandq %0;\n\t"
+#error Only support for gcc or clang currently
 #endif
-            "setc %1"
-            :"=a"(rando),"=qm"(err)
-            :
-            :);
 
     } while (err == 0);
 
