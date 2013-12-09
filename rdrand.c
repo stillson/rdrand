@@ -31,7 +31,7 @@
 #include <Python.h>
 
 unsigned long int get_bits(void);
-int RdRand_cpuid();
+int RdRand_cpuid(void);
 
 PyDoc_STRVAR(module_doc, "rdrand: Python interface to intel hardware rng\n");
 
@@ -52,7 +52,7 @@ PyDoc_STRVAR(module_doc, "rdrand: Python interface to intel hardware rng\n");
 #define RDRAND_MASK   0x40000000
 
 int
-RdRand_cpuid()
+RdRand_cpuid(void)
 {
     int info[4] = {-1, -1, -1, -1};
 
@@ -87,7 +87,11 @@ get_bits(void)
     // to reexamine for future versions
     do
     {
+#ifdef __linux__
+        asm("rdrand %0;\n\t"
+#else
         asm("rdrandq %0;\n\t"
+#endif
             "setc %1"
             :"=a"(rando),"=qm"(err)
             :
