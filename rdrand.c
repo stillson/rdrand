@@ -2,6 +2,9 @@
  * Copyright (c) 2013, Chris Stillson <stillson@gmail.com>
  * All rights reserved.
  *
+ * portions of this code
+ * Copyright � 2012, Intel Corporation.  All rights reserved.
+ * (Namely, the cpuid checking code)
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
@@ -28,8 +31,49 @@
 #include <Python.h>
 
 unsigned long int get_bits(void);
+int RdRand_cpuid();
 
 PyDoc_STRVAR(module_doc, "rdrand: Python interface to intel hardware rng\n");
+
+/*! \brief Queries cpuid to see if rdrand is supported
+ *
+ * rdrand support in a CPU is determined by examining the 30th bit of the ecx
+ * register after calling cpuid.
+ *
+ * \return bool of whether or not rdrand is supported
+ */
+
+# define __cpuid(x,y) asm("cpuid":"=a"(x[0]),"=b"(x[1]),"=c"(x[2]),"=d"(x[3]):"a"(y))
+
+/*! \def RDRAND_MASK
+ *    The bit mask used to examine the ecx register returned by cpuid. The
+ *   30th bit is set.
+ */
+#define RDRAND_MASK   0x40000000
+
+int
+RdRand_cpuid()
+{
+    int info[4] = {-1, -1, -1, -1};
+
+    /* Are we on an Intel processor? */
+    __cpuid(info, 0);
+
+    if ( memcmp((void *) &info[1], (void *) "Genu", 4) != 0 ||
+        memcmp((void *) &info[3], (void *) "ineI", 4) != 0 ||
+        memcmp((void *) &info[2], (void *) "ntel", 4) != 0 )
+        return 0;
+
+    /* Do we have RDRAND? */
+
+     __cpuid(info, /*feature bits*/1);
+
+     int ecx = info[2];
+     if ((ecx & RDRAND_MASK) == RDRAND_MASK)
+         return 1;
+     else
+         return 0;
+}
 
 //utility to return 64 random bits
 unsigned long int
@@ -169,6 +213,8 @@ init_rdrand(void)
         PyObject *m;
 
         // I need to verify that cpu type can do rdrand
+        if (RdRand_cpuid() != 1)
+            return;
 
         m = Py_InitModule3("_rdrand", rdrand_functions, module_doc);
         if (m == NULL)
