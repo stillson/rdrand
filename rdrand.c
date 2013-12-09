@@ -31,7 +31,7 @@ unsigned long int get_bits(void);
 
 PyDoc_STRVAR(module_doc, "rdrand: Python interface to intel hardware rng\n");
 
-//utility to return 64 random bytes
+//utility to return 64 random bits
 unsigned long int
 get_bits(void)
 {
@@ -111,8 +111,55 @@ rdrand_get_bits(PyObject *self, PyObject *args)
     return result;
 }
 
+static PyObject *
+rdrand_get_bytes(PyObject *self, PyObject *args)
+{
+    int num_bytes, i;
+    int num_quads, num_chars;
+    unsigned char * data = NULL;
+    unsigned long int rando;
+    PyObject *result;
+
+    if ( !PyArg_ParseTuple(args, "i", &num_bytes) )
+        return NULL;
+
+    if (num_bytes <= 0)
+    {
+        PyErr_SetString(PyExc_ValueError, "number of bytes must be greater than zero");
+        return NULL;
+    }
+
+    data        = (unsigned char *)PyMem_Malloc(num_bytes);
+    num_quads   = num_bytes / 8;
+    num_chars   = num_bytes % 8;
+
+    if (data == NULL)
+    {
+        PyErr_NoMemory();
+        return NULL;
+    }
+
+    for(i = 0; i < num_quads; i++)
+    {
+        rando = get_bits();
+        bcopy((char*)&rando, &data[i * 8], 8);
+    }
+
+    if(num_chars)
+    {
+        rando = get_bits();
+        bcopy((char*)&rando, &data[num_quads * 8], num_chars);
+    }
+
+    /* Probably hosing byte order. big deal it's hardware random, has no meaning til we assign it */
+    result = Py_BuildValue("s#", data, num_bytes);
+    PyMem_Free(data);
+    return result;
+}
+
 static PyMethodDef rdrand_functions[] = {
         {"rdrand_get_bits",       rdrand_get_bits,        METH_VARARGS, "rdrand_get_bits()"},
+        {"rdrand_get_bytes",      rdrand_get_bytes,       METH_VARARGS, "rdrand_get_bytes()"},
         {NULL,      NULL}   /* Sentinel */
 };
 
@@ -120,6 +167,8 @@ PyMODINIT_FUNC
 init_rdrand(void)
 {
         PyObject *m;
+
+        // I need to verify that cpu type can do rdrand
 
         m = Py_InitModule3("_rdrand", rdrand_functions, module_doc);
         if (m == NULL)
