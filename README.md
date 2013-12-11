@@ -3,6 +3,9 @@ RDRAND
 
 A module to use Intel's hardware RNG with python's random class
 
+This module is distributed via the cheese shop (pypi.python.org), so to install it,
+all that is required is ``easy_install`` and a compiler (and python)
+
 USAGE
 -----
 
