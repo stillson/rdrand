@@ -30,6 +30,22 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
+#ifdef __i386__
+#define IS32BIT 1
+#else
+#define IS64BIT 1
+#endif
+
+#ifdef __GNUC__
+#define USING_GCC 1
+#elif __clang__
+#define USING_CLANG 1
+#else
+#error Only support for gcc or clang currently
+#error if you port to another compiler, please
+#error send back the patch to https://github.com/stillson/rdrand
+#endif
+
 unsigned long int get_bits(void);
 int RdRand_cpuid(void);
 
@@ -75,6 +91,7 @@ RdRand_cpuid(void)
          return 0;
 }
 
+#if IS64BIT
 //utility to return 64 random bits
 unsigned long int
 get_bits(void)
@@ -87,20 +104,52 @@ get_bits(void)
     // to reexamine for future versions
     do
     {
-#ifdef __GNUC__
-        //asm("rdrand %0;\n\t" "setc %1" :"=a"(rando),"=qm"(err));
+#if USING_GCC
         asm volatile(".byte 0x48; .byte 0x0f; .byte 0xc7; .byte 0xf0; setc %1":"=a"(rando), "=qm"(err));
 
-#elif  __clang__
+#elif USING_CLANG
         asm("rdrandq %0;\n\t" "setc %1" :"=a"(rando),"=qm"(err) : :);
-#else
-#error Only support for gcc or clang currently
 #endif
 
     } while (err == 0);
 
     return rando;
 }
+#elif IS32BIT
+unsigned long int
+get_bits(void)
+{
+    unsigned long int rando = 0;
+    unsigned char err = 0;
+    unsigned int rando1, rando2;
+
+    // Yes, this is inline assembly.
+    // should never really fail, may have
+    // to reexamine for future versions
+    do
+    {
+#if USING_GCC
+        asm volatile(".byte 0x0f; .byte 0xc7; .byte 0xf0; setc %1":"=a"(rando1), "=qm"(err));
+#elif USING_CLANG
+        asm("rdrandw %0;\n\t" "setc %1" :"=a"(rando1),"=qm"(err) : :);
+#endif
+    } while (err == 0);
+
+    do
+    {
+#if USING_GCC
+        asm volatile(".byte 0x0f; .byte 0xc7; .byte 0xf0; setc %1":"=a"(rando2), "=qm"(err));
+#elif USING_CLANG
+        asm("rdrandw %0;\n\t" "setc %1" :"=a"(rando2),"=qm"(err) : :);
+#endif
+    } while (err == 0);
+
+    rando = rando1;
+    rando = rando << 32;
+    rando = rando + rando2;
+    return rando;
+}
+#endif
 
 static PyObject *
 rdrand_get_bits(PyObject *self, PyObject *args)

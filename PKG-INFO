@@ -8,11 +8,16 @@ Download-url: UNKNOWN
 Summary: Python interface to Intel hardware rng
 License: New BSD license
 Description: python random.Random() subclass which uses a c
-                 extension to use the Intel processor extension
-                 to access a real random number generator.
+extension to use the Intel processor extension
+to access a real random number generator.
 
-        Requires a compiler to build. Tested with clang and gcc. Requires an Intel processor with the RDRAND instruction
-Keywords: random rng
+Requires a compiler to build. Tested with clang and gcc.
+
+This should provide cryptographically secure random numbers, if
+the Intel random number generator is valid. No mitigation is done
+to modify the output of the hardware to prevent problems with
+Intel's implementation. Caveat Emptor.
+Keywords: intel hardware random number generator rng
 Platform: UNKNOWN
 Classifier: Development Status :: 4 - Beta
 Classifier: Intended Audience :: Developers
