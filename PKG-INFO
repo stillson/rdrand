@@ -1,6 +1,6 @@
-Metadata-Version: 1.1
+Metadata-Version: 1.2
 Name: rdrand
-Version: 0.2.2
+Version: 0.2.3
 Author: Chris Stillson
 Author-email: stillson at gmail com
 Home-page: https://github.com/stillson/rdrand

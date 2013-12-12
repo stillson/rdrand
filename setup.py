@@ -1,7 +1,7 @@
 from distutils.core import setup, Extension
 
 setup(name='rdrand',
-      version='0.2.2',
+      version='0.2.3',
       description="Python interface to Intel hardware rng",
       long_description= \
       """python random.Random() subclass which uses a c
