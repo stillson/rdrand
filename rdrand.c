@@ -46,7 +46,11 @@
 #error send back the patch to https://github.com/stillson/rdrand
 #endif
 
+#if IS32BIT
+unsigned long long int get_bits(void);
+#else
 unsigned long int get_bits(void);
+#endif
 int RdRand_cpuid(void);
 
 PyDoc_STRVAR(module_doc, "rdrand: Python interface to intel hardware rng\n");
@@ -59,21 +63,31 @@ PyDoc_STRVAR(module_doc, "rdrand: Python interface to intel hardware rng\n");
  * \return bool of whether or not rdrand is supported
  */
 
-# define __cpuid(x,y) asm("cpuid":"=a"(x[0]),"=b"(x[1]),"=c"(x[2]),"=d"(x[3]):"a"(y))
-
 /*! \def RDRAND_MASK
  *    The bit mask used to examine the ecx register returned by cpuid. The
  *   30th bit is set.
  */
 #define RDRAND_MASK   0x40000000
 
+void 
+cpuid(unsigned int op, unsigned int reg[4])
+{
+    asm volatile("pushl %%ebx      \n\t" /* save %ebx */
+                 "cpuid            \n\t"
+                 "movl %%ebx, %1   \n\t" /* save what cpuid just put in %ebx */
+                 "popl %%ebx       \n\t" /* restore the old %ebx */
+                 : "=a"(reg[0]), "=r"(reg[1]), "=c"(reg[2]), "=d"(reg[3])
+                 : "a"(op)
+                 : "cc");
+}
+
 int
 RdRand_cpuid(void)
 {
-    int info[4] = {-1, -1, -1, -1};
+    unsigned int info[4] = {-1, -1, -1, -1};
 
     /* Are we on an Intel processor? */
-    __cpuid(info, 0);
+    cpuid(0, info);
 
     if ( memcmp((void *) &info[1], (void *) "Genu", 4) != 0 ||
         memcmp((void *) &info[3], (void *) "ineI", 4) != 0 ||
@@ -81,14 +95,13 @@ RdRand_cpuid(void)
         return 0;
 
     /* Do we have RDRAND? */
+    cpuid(1, info);
 
-     __cpuid(info, /*feature bits*/1);
-
-     int ecx = info[2];
-     if ((ecx & RDRAND_MASK) == RDRAND_MASK)
-         return 1;
-     else
-         return 0;
+    int ecx = info[2];
+    if ((ecx & RDRAND_MASK) == RDRAND_MASK)
+        return 1;
+    else
+        return 0;
 }
 
 #if IS64BIT
@@ -116,12 +129,19 @@ get_bits(void)
     return rando;
 }
 #elif IS32BIT
-unsigned long int
+unsigned long long int
 get_bits(void)
 {
-    unsigned long int rando = 0;
+    unsigned long long int rando = 0;
     unsigned char err = 0;
     unsigned int rando1, rando2;
+    union{
+       unsigned long long int rando;
+       struct {
+          unsigned int rando1;
+          unsigned int rando2;
+       } i;
+    } un;
 
     // Yes, this is inline assembly.
     // should never really fail, may have
@@ -129,25 +149,22 @@ get_bits(void)
     do
     {
 #if USING_GCC
-        asm volatile(".byte 0x0f; .byte 0xc7; .byte 0xf0; setc %1":"=a"(rando1), "=qm"(err));
+        asm volatile(".byte 0x0f; .byte 0xc7; .byte 0xf0; setc %1":"=a"(un.i.rando1), "=qm"(err));
 #elif USING_CLANG
-        asm("rdrandw %0;\n\t" "setc %1" :"=a"(rando1),"=qm"(err) : :);
+        asm("rdrandw %0;\n\t" "setc %1" :"=a"(un.i.rando1),"=qm"(err) : :);
 #endif
     } while (err == 0);
 
     do
     {
 #if USING_GCC
-        asm volatile(".byte 0x0f; .byte 0xc7; .byte 0xf0; setc %1":"=a"(rando2), "=qm"(err));
+        asm volatile(".byte 0x0f; .byte 0xc7; .byte 0xf0; setc %1":"=a"(un.i.rando2), "=qm"(err));
 #elif USING_CLANG
-        asm("rdrandw %0;\n\t" "setc %1" :"=a"(rando2),"=qm"(err) : :);
+        asm("rdrandw %0;\n\t" "setc %1" :"=a"(un.i.rando2),"=qm"(err) : :);
 #endif
     } while (err == 0);
 
-    rando = rando1;
-    rando = rando << 32;
-    rando = rando + rando2;
-    return rando;
+    return un.rando;
 }
 #endif
 
@@ -157,7 +174,11 @@ rdrand_get_bits(PyObject *self, PyObject *args)
     int num_bits, num_bytes, i;
     int num_quads, num_chars;
     unsigned char * data = NULL;
+#if IS32BIT
+    unsigned long long int rando;
+#else
     unsigned long int rando;
+#endif
     unsigned char last_mask, lm_shift;
     PyObject *result;
 
