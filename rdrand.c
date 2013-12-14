@@ -69,9 +69,15 @@ PyDoc_STRVAR(module_doc, "rdrand: Python interface to intel hardware rng\n");
  */
 #define RDRAND_MASK   0x40000000
 
-void 
+# define __cpuid(x,y) asm("cpuid":"=a"(x[0]),"=b"(x[1]),"=c"(x[2]),"=d"(x[3]):"a"(y))
+
+void
 cpuid(unsigned int op, unsigned int reg[4])
 {
+
+#if USING_GCC && IS64BIT
+    __cpuid(reg, op);
+#else
     asm volatile("pushl %%ebx      \n\t" /* save %ebx */
                  "cpuid            \n\t"
                  "movl %%ebx, %1   \n\t" /* save what cpuid just put in %ebx */
@@ -79,6 +85,7 @@ cpuid(unsigned int op, unsigned int reg[4])
                  : "=a"(reg[0]), "=r"(reg[1]), "=c"(reg[2]), "=d"(reg[3])
                  : "a"(op)
                  : "cc");
+#endif
 }
 
 int

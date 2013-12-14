@@ -1,7 +1,7 @@
 from distutils.core import setup, Extension
 
 setup(name='rdrand',
-      version='0.5.0',
+      version='0.5.3',
       description="Python interface to Intel hardware rng",
       long_description= \
       """RDRAND
