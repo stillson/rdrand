@@ -1,7 +1,7 @@
 from distutils.core import setup, Extension
 
 setup(name='rdrand',
-      version='0.2.4',
+      version='0.5.0',
       description="Python interface to Intel hardware rng",
       long_description= \
       """RDRAND
@@ -30,6 +30,8 @@ Also, it includes the function ``r.getrandombytes(i)`` where ``i`` is a positive
 of length ``i`` filled with random bytes, which is ideal for generating a key or using directly in a protocol.
 
 Please note, as with any security solution, it is possible to subvert this. Please understand the full context before deploying. I am not liable for misuse or clever hackers.
+
+Works with 32 and 64 bit builds of python.
 """,
       author="Chris Stillson",
       author_email="stillson@gmail.com",
