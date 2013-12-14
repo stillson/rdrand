@@ -4,8 +4,7 @@ setup(name='rdrand',
       version='0.2.3',
       description="Python interface to Intel hardware rng",
       long_description= \
-      """
-RDRAND
+      """RDRAND
 ======
 
 A module to use Intel's hardware RNG with python's random class
