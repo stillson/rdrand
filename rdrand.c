@@ -30,10 +30,10 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 
-#ifdef __i386__
-#define IS32BIT 1
-#else
+#ifdef _LP64
 #define IS64BIT 1
+#else
+#define IS32BIT 1
 #endif
 
 #ifdef __GNUC__
@@ -46,11 +46,15 @@
 #error send back the patch to https://github.com/stillson/rdrand
 #endif
 
-#if IS32BIT
-unsigned long long int get_bits(void);
+#if PY_MAJOR_VERSION == 2
+#define PYTHON2 1
+#elif PY_MAJOR_VERSION == 3
+#define PYTHON3 1
 #else
-unsigned long int get_bits(void);
+#error requires python 2 or 3
 #endif
+
+uint64_t get_bits(void);
 int RdRand_cpuid(void);
 
 PyDoc_STRVAR(module_doc, "rdrand: Python interface to intel hardware rng\n");
@@ -113,7 +117,7 @@ RdRand_cpuid(void)
 
 #if IS64BIT
 //utility to return 64 random bits
-unsigned long int
+uint64_t
 get_bits(void)
 {
     unsigned long int rando = 0;
@@ -136,17 +140,15 @@ get_bits(void)
     return rando;
 }
 #elif IS32BIT
-unsigned long long int
+uint64_t
 get_bits(void)
 {
-    unsigned long long int rando = 0;
     unsigned char err = 0;
-    unsigned int rando1, rando2;
     union{
-       unsigned long long int rando;
+       uint64_t rando;
        struct {
-          unsigned int rando1;
-          unsigned int rando2;
+          uint32_t rando1;
+          uint32_t rando2;
        } i;
     } un;
 
@@ -181,11 +183,7 @@ rdrand_get_bits(PyObject *self, PyObject *args)
     int num_bits, num_bytes, i;
     int num_quads, num_chars;
     unsigned char * data = NULL;
-#if IS32BIT
-    unsigned long long int rando;
-#else
-    unsigned long int rando;
-#endif
+    uint64_t rando;
     unsigned char last_mask, lm_shift;
     PyObject *result;
 
@@ -242,7 +240,7 @@ rdrand_get_bytes(PyObject *self, PyObject *args)
     int num_bytes, i;
     int num_quads, num_chars;
     unsigned char * data = NULL;
-    unsigned long int rando;
+    uint64_t rando;
     PyObject *result;
 
     if ( !PyArg_ParseTuple(args, "i", &num_bytes) )
@@ -277,7 +275,11 @@ rdrand_get_bytes(PyObject *self, PyObject *args)
     }
 
     /* Probably hosing byte order. big deal it's hardware random, has no meaning til we assign it */
+#if PYTHON2 == 1
     result = Py_BuildValue("s#", data, num_bytes);
+#else
+    result = Py_BuildValue("y#", data, num_bytes);
+#endif
     PyMem_Free(data);
     return result;
 }
@@ -285,9 +287,10 @@ rdrand_get_bytes(PyObject *self, PyObject *args)
 static PyMethodDef rdrand_functions[] = {
         {"rdrand_get_bits",       rdrand_get_bits,        METH_VARARGS, "rdrand_get_bits()"},
         {"rdrand_get_bytes",      rdrand_get_bytes,       METH_VARARGS, "rdrand_get_bytes()"},
-        {NULL,      NULL}   /* Sentinel */
+        {NULL, NULL, 0, NULL}   /* Sentinel */
 };
 
+#if PYTHON2 == 1
 PyMODINIT_FUNC
 init_rdrand(void)
 {
@@ -305,3 +308,28 @@ init_rdrand(void)
         if (m == NULL)
             return;
 }
+#else
+static struct PyModuleDef rdrandmodule = {
+   PyModuleDef_HEAD_INIT, "_rdrand", module_doc, -1, rdrand_functions
+};
+
+PyMODINIT_FUNC
+PyInit__rdrand(void)
+{
+        PyObject *m;
+
+        // I need to verify that cpu type can do rdrand
+        if (RdRand_cpuid() != 1)
+        {
+            PyErr_SetString(PyExc_SystemError,
+                        "CPU doesn't have random number generator");
+            return NULL;
+        }
+
+        m = PyModule_Create(&rdrandmodule);
+        if (m == NULL)
+            return NULL;
+
+        return m;
+}
+#endif

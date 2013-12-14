@@ -25,12 +25,14 @@
 
 from random import Random
 try:
-    from _rdrand import (rdrand_get_bits, rdrand_get_bytes)
+    import _rdrand
 except SystemError as e:
-    print "This module requires a cpu which has a hardware" +\
-          " random number generator"
+    print( "This module requires a cpu which has a hardware" +\
+          " random number generator")
     raise e
 
+rdrand_get_bits = _rdrand.rdrand_get_bits
+rdrand_get_bytes = _rdrand.rdrand_get_bytes
 
 class RdRandom(Random):
     """Alternate random number generator using intel's rdrand instructions
