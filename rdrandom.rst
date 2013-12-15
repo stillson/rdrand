@@ -25,5 +25,7 @@ Works with 32 and 64 bit builds of python.
 
 Works with python2 and python3.
 
-Planned for version 2: various mitigations to whiten the random numbers in case you don't trust Intel.
+planned for version 1.5: whitening added, written in python
+
+Planned for version 2: whitening added, backwards compatible with 1.5, but written in C.
 
