@@ -1,3 +1,6 @@
+Branch to work on mitigations for possibly backdoored RNG
+
+
 RDRAND
 ======
 
