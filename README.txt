@@ -1,16 +1,14 @@
 RDRAND
-======
 
 A module to use Intel's hardware RNG with python's random class
 
 USAGE
------
 
-            #easy_install rdrand
-            #python
+#easy_install rdrand
+#python
 
-            >>>from rdrand import RdRandom
-            >>>r = RdRandom()
+>>>from rdrand import RdRandom
+>>>r = RdRandom()
 
 
 At this point, ``r`` will behave just like ``random``
