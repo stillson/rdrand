@@ -25,31 +25,31 @@
 
 from random import Random
 try:
-    import _rdrand
+    import _rdseed
 except SystemError as e:
-    print( "This module requires a cpu which supports the" +\
-          " RdRand instruction")
+    print( "This module requires a cpu which supports" +\
+          " the RdSeed instruction")
     raise e
 
-rdrand_get_bits = _rdrand.rdrand_get_bits
-rdrand_get_bytes = _rdrand.rdrand_get_bytes
+rdseed_get_bits = _rdseed.rdseed_get_bits
+rdseed_get_bytes = _rdseed.rdseed_get_bytes
 
-class RdRandom(Random):
-    """Alternate random number generator using Intel's RdRand instructions
+class RdSeedom(Random):
+    """Alternate random number generator using Intel's RdSeed instructions
      to access the hardware random number generator.
      Not available on all systems (see os.urandom() for details).
     """
 
     def random(self):
         """Get the next random number in the range [0.0, 1.0)."""
-        return (1.0 * rdrand_get_bits(52)) / (2 ** 52)
+        return (1.0 * rdseed_get_bits(52)) / (2 ** 52)
 
     def getrandbytes(self, k):
         if k <= 0:
             raise ValueError('number of bytes must be greater than zero')
         if k != int(k):
             raise TypeError('number of bytes should be an integer')
-        return rdrand_get_bytes(k)
+        return rdseed_get_bytes(k)
 
     def getrandbits(self, k):
         """getrandbits(k) -> x.  Generates a long int with k random bits."""
@@ -57,7 +57,7 @@ class RdRandom(Random):
             raise ValueError('number of bits must be greater than zero')
         if k != int(k):
             raise TypeError('number of bits should be an integer')
-        return rdrand_get_bits(k)
+        return rdseed_get_bits(k)
 
     def _stub(self, *args, **kwds):
         "Stub method.  Not used for a system random number generator."
