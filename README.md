@@ -1,6 +1,8 @@
 RDRAND
 ======
 
+[![Join the chat at https://gitter.im/python-rdrand/Lobby](https://badges.gitter.im/python-rdrand/Lobby.svg)](https://gitter.im/python-rdrand/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 A module to use Intel's hardware RNG with python's random class
 
 This module is distributed via the cheese shop (pypi.python.org), so to install it,
