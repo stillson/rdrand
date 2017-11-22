@@ -24,32 +24,41 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from random import Random
-try:
-    import _rdrand
-except SystemError as e:
+import _rdrand
+
+if not _rdrand.HAS_RAND == 1:
     print( "This module requires a cpu which supports the" +\
           " RdRand instruction")
-    raise e
+    raise SystemError
 
 rdrand_get_bits = _rdrand.rdrand_get_bits
 rdrand_get_bytes = _rdrand.rdrand_get_bytes
 
-class RdRandom(Random):
-    """Alternate random number generator using Intel's RdRand instructions
-     to access the hardware random number generator.
-     Not available on all systems (see os.urandom() for details).
+if _rdrand.HAS_SEED == 1:
+    rdseed_get_bits = _rdrand.rdseed_get_bits
+    rdseed_get_bytes = _rdrand.rdseed_get_bytes
+
+
+class BaseRandom(Random):
+    """Base class for alternate random number generator using
+     Intel's RdRand or RdSeed instructions to access the
+     hardware random number generator. Not available on all
+     systems (see os.urandom() for details).
     """
+
+    get_bits = None
+    get_bytes = None
 
     def random(self):
         """Get the next random number in the range [0.0, 1.0)."""
-        return (1.0 * rdrand_get_bits(52)) / (2 ** 52)
+        return (1.0 * self.get_bits(52)) / (2 ** 52)
 
     def getrandbytes(self, k):
         if k <= 0:
             raise ValueError('number of bytes must be greater than zero')
         if k != int(k):
             raise TypeError('number of bytes should be an integer')
-        return rdrand_get_bytes(k)
+        return self.get_bytes(k)
 
     def getrandbits(self, k):
         """getrandbits(k) -> x.  Generates a long int with k random bits."""
@@ -57,7 +66,7 @@ class RdRandom(Random):
             raise ValueError('number of bits must be greater than zero')
         if k != int(k):
             raise TypeError('number of bits should be an integer')
-        return rdrand_get_bits(k)
+        return self.get_bits(k)
 
     def _stub(self, *args, **kwds):
         "Stub method.  Not used for a system random number generator."
@@ -69,3 +78,14 @@ class RdRandom(Random):
         raise NotImplementedError('System entropy source does not have state.')
     getstate = setstate = _notimplemented
 
+
+
+if _rdrand.HAS_RAND == 1:
+    class RdRandom(BaseRandom):
+        get_bits = rdrand_get_bits
+        get_bytes = rdrand_get_bytes
+
+if _rdrand.HAS_SEED == 1:
+    class RdSeedom(BaseRandom):
+        get_bits = rdseed_get_bits
+        get_bytes = rdseed_get_bytes

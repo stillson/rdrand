@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Chris Stillson <stillson@gmail.com>
+ * Copyright (c) 2013, 2017 Chris Stillson <stillson@gmail.com>
  * All rights reserved.
  *
  * portions of this code
@@ -496,10 +496,6 @@ rdseed_get_bytes(PyObject *self, PyObject *args)
 static PyMethodDef rdrand_functions[] = {
         {"rdrand_get_bits",       rdrand_get_bits,        METH_VARARGS, "rdrand_get_bits()"},
         {"rdrand_get_bytes",      rdrand_get_bytes,       METH_VARARGS, "rdrand_get_bytes()"},
-        {NULL, NULL, 0, NULL}   /* Sentinel */
-};
-
-static PyMethodDef rdseed_functions[] = {
         {"rdseed_get_bits",       rdseed_get_bits,        METH_VARARGS, "rdseed_get_bits()"},
         {"rdseed_get_bytes",      rdseed_get_bytes,       METH_VARARGS, "rdseed_get_bytes()"},
         {NULL, NULL, 0, NULL}   /* Sentinel */
@@ -510,86 +506,53 @@ PyMODINIT_FUNC
 init_rdrand(void)
 {
         PyObject *m;
+        int has_rand, has_seed;
 
         // I need to verify that cpu type can do rdrand
+        has_rand = 1;
         if (RdRand_cpuid() != 1)
-        {
-            PyErr_SetString(PyExc_SystemError,
-                        "CPU doesn't have RdRand Instruction");
-            return;
-        }
+            has_rand = 0;
+
+        has_seed = 1;
+        if (RdSeed_cpuid() != 1)
+            has_seed = 0;
 
         m = Py_InitModule3("_rdrand", rdrand_functions, module_doc);
         if (m == NULL)
             return;
-}
 
-PyMODINIT_FUNC
-init_rdseed(void)
-{
-        PyObject *m;
-
-        // I need to verify that cpu type can do rdseed
-        int err = RdSeed_cpuid();
-        char astring[256];
-        sprintf(astring,"CPU doesn't have RdSeed instruction ebx=0x%08x",err);
-        if (err != 1)
-        {
-            PyErr_SetString(PyExc_SystemError,
-                        astring);
-            return;
-        }
-
-        m = Py_InitModule3("_rdseed", rdseed_functions, module_doc);
-        if (m == NULL)
-            return;
+        PyModule_AddIntConstant(m, "HAS_RAND", has_rand);
+        PyModule_AddIntConstant(m, "HAS_SEED", has_seed);
 }
 #else
 static struct PyModuleDef rdrandmodule = {
    PyModuleDef_HEAD_INIT, "_rdrand", module_doc, -1, rdrand_functions
 };
 
-static struct PyModuleDef rdseedmodule = {
-   PyModuleDef_HEAD_INIT, "_rdseed", module_doc, -1, rdseed_functions
-};
-
 PyMODINIT_FUNC
 PyInit__rdrand(void)
 {
         PyObject *m;
+        int has_rand, has_seed;
 
         // I need to verify that cpu type can do rdrand
+        has_rand = 1;
         if (RdRand_cpuid() != 1)
-        {
-            PyErr_SetString(PyExc_SystemError,
-                        "CPU doesn't have RdRand instruction");
-            return NULL;
-        }
+            has_rand = 0;
+
+        has_seed = 1;
+        if (RdSeed_cpuid() != 1)
+            has_seed = 0;
 
         m = PyModule_Create(&rdrandmodule);
         if (m == NULL)
             return NULL;
 
-        return m;
-}
-
-PyMODINIT_FUNC
-PyInit__rdseed(void)
-{
-        PyObject *m;
-
-        // I need to verify that cpu type can do rdrand
-        if (RdSeed_cpuid() != 1)
-        {
-            PyErr_SetString(PyExc_SystemError,
-                        "CPU doesn't have RdSeed instruction A");
-            return NULL;
-        }
-
-        m = PyModule_Create(&rdseedmodule);
-        if (m == NULL)
-            return NULL;
+        PyModule_AddIntConstant(m, "HAS_RAND", has_rand);
+        PyModule_AddIntConstant(m, "HAS_SEED", has_seed);
 
         return m;
 }
+
+
 #endif
