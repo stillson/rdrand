@@ -6,7 +6,7 @@ RDRAND
 A module to use Intel's hardware RNG with python's random class
 
 This module is distributed via the cheese shop (pypi.python.org), so to install it,
-all that is required is ``easy_install`` and a compiler (and python)
+all that is required is ``easy_install``  or ``pip`` and a compiler (and python)
 
 USAGE
 -----
@@ -36,3 +36,5 @@ Also, both RdRandom and RdSeedom include the function ``r.getrandbytes(i)`` wher
 of length ``i`` filled with random bytes, which is ideal for generating a key or using directly in a protocol.
 
 Please note, as with any security solution, it is possible to subvert this. Please understand the full context before deploying. I am not liable for misuse or clever hackers.
+
+Special thanks to David Johnston @dj-on-github for the RdSeed code.
