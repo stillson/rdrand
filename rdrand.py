@@ -23,23 +23,20 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from random import Random
-import _rdrand
+from random import Random as StdRandom
+from _rdrand import *
 
-if not _rdrand.HAS_RAND == 1:
+if HAS_RAND == 0:
     print( "This module requires a cpu which supports the" +\
           " RdRand instruction")
     raise SystemError
 
-rdrand_get_bits = _rdrand.rdrand_get_bits
-rdrand_get_bytes = _rdrand.rdrand_get_bytes
-
-if _rdrand.HAS_SEED == 1:
-    rdseed_get_bits = _rdrand.rdseed_get_bits
-    rdseed_get_bytes = _rdrand.rdseed_get_bytes
+if HAS_SEED == 0:
+    rdseed_get_bits = None
+    rdseed_get_bytes = None
 
 
-class BaseRandom(Random):
+class BaseRandom(StdRandom):
     """Base class for alternate random number generator using
      Intel's RdRand or RdSeed instructions to access the
      hardware random number generator. Not available on all
@@ -50,7 +47,9 @@ class BaseRandom(Random):
     get_bytes = None
 
     def random(self):
-        """Get the next random number in the range [0.0, 1.0)."""
+        """Get the next random number in the range [0.0, 1.0).
+           52 is the number of bits
+        """
         return (1.0 * self.get_bits(52)) / (2 ** 52)
 
     def getrandbytes(self, k):
@@ -80,12 +79,12 @@ class BaseRandom(Random):
 
 
 
-if _rdrand.HAS_RAND == 1:
+if HAS_RAND == 1:
     class RdRandom(BaseRandom):
         get_bits = rdrand_get_bits
         get_bytes = rdrand_get_bytes
 
-if _rdrand.HAS_SEED == 1:
+if HAS_SEED == 1:
     class RdSeedom(BaseRandom):
         get_bits = rdseed_get_bits
         get_bytes = rdseed_get_bytes
