@@ -29,13 +29,19 @@
 
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
+#include <stdint.h>
 
+
+// You may have some issues compiling this to 16 bit. Like getting python to work.
 #ifdef _LP64
 #define IS64BIT 1
 #else
 #define IS32BIT 1
 #endif
 
+
+// Willing to support other compilers, if you can get me access to them, and they
+// build python
 #ifdef __GNUC__
 #define USING_GCC 1
 #elif __clang__
@@ -61,6 +67,15 @@ int RdSeed_cpuid(void);
 
 PyDoc_STRVAR(module_doc, "rdrand: Python interface to Intel and AMD hardware RNG\n");
 
+
+
+/* **********************
+ *
+ *  CHECK CPU
+ *
+   ********************** */
+
+
 /*! \brief Queries cpuid to see if rdrand is supported
  *
  * rdrand support in a CPU is determined by examining the 30th bit of the ecx
@@ -75,14 +90,13 @@ PyDoc_STRVAR(module_doc, "rdrand: Python interface to Intel and AMD hardware RNG
  */
 #define RDRAND_MASK   0x40000000
 
-
 /*! \def RDSEED_MASK
  *    The bit mask used to examine the ebx register returned by cpuid. The
  *   18th bit is set.
  */
 #define RDSEED_MASK   0x00040000
 
-# define __cpuid(x,y,s) asm("cpuid":"=a"(x[0]),"=b"(x[1]),"=c"(x[2]),"=d"(x[3]):"a"(y),"c"(s))
+#define __cpuid(x,y,s) asm("cpuid":"=a"(x[0]),"=b"(x[1]),"=c"(x[2]),"=d"(x[3]):"a"(y),"c"(s))
 
 void
 cpuid(unsigned int op, unsigned int subfunc, unsigned int reg[4])
@@ -156,35 +170,77 @@ RdSeed_cpuid(void)
         return info[1];
 }
 
+
+/* **********************
+ *
+ *  RDRAND code
+ *
+   ********************** */
+
 #if IS64BIT
+
+#define GETRAND(rando) asm volatile("1:\n"                    \
+                                    "rdrandq %0\n"            \
+                                    "jnc 1b\n"                \
+                                    :"=a"(rando) : : "cc")
+
+// read random bytes into supplied buffer
+// len is in 64 bit words, not bytes
+void
+fill_buf_using_rdrand(uint64_t *buf, uint32_t buf_len)
+{
+    unsigned long int rando = 0;
+
+    for (uint32_t i = 0; i < buf_len; i++)
+    {
+        GETRAND(rando);
+        buf[i] = rando;
+    }
+}
+
 //utility to return 64 random bits from RdRand
 uint64_t
 get_bits_using_rdrand(void)
 {
     unsigned long int rando = 0;
-    unsigned char err = 0;
-
-    // Yes, this is inline assembly.
-    // should never really fail, may have
-    // to reexamine for future versions
-    do
-    {
-#if USING_GCC
-        asm volatile(".byte 0x48; .byte 0x0f; .byte 0xc7; .byte 0xf0; setc %1":"=a"(rando), "=qm"(err));
-
-#elif USING_CLANG
-        asm("rdrandq %0;\n\t" "setc %1" :"=a"(rando),"=qm"(err) : :);
-#endif
-
-    } while (err == 0);
-
+    GETRAND(rando);
     return rando;
 }
 #elif IS32BIT
+
+#define GETRAND(rando) asm volatile("1:\n"                   \
+                                    "rdrand %0\n"            \
+                                    "jnc 1b\n"               \
+                                    :"=a"(rando) : : "cc")
+
+
+// read random bytes into supplied buffer
+// len is in 64 bit words, not bytes
+void
+fill_buf_using_rdrand(uint64_t *buf, uint32_t buf_len)
+{
+    unsigned int prerand = 0;
+    uint64_t prerando = 0;
+    uint64_t rando = 0;
+
+    for (uint32_t i = 0; i < buf_len; i++)
+    {
+        GETRAND(prerand);
+        rando = prerand;
+        prerando <<= 32;
+        rando |= prerando;
+        GETRAND(prerand);
+        prerando = prerand;
+        prerando <<= 32;
+        rando |= prerando;
+        buf[i] = rando;
+    }
+}
+
 uint64_t
 get_bits_using_rdrand(void)
 {
-    unsigned char err = 0;
+    register unsigned int pre_rand;
     union{
        uint64_t rando;
        struct {
@@ -193,60 +249,64 @@ get_bits_using_rdrand(void)
        } i;
     } un;
 
-    // Yes, this is inline assembly.
-    // should never really fail, may have
-    // to reexamine for future versions
-    do
-    {
-#if USING_GCC
-        asm volatile(".byte 0x0f; .byte 0xc7; .byte 0xf0; setc %1":"=a"(un.i.rando1), "=qm"(err));
-#elif USING_CLANG
-        asm("rdrandw %0;\n\t" "setc %1" :"=a"(un.i.rando1),"=qm"(err) : :);
-#endif
-    } while (err == 0);
-
-    do
-    {
-#if USING_GCC
-        asm volatile(".byte 0x0f; .byte 0xc7; .byte 0xf0; setc %1":"=a"(un.i.rando2), "=qm"(err));
-#elif USING_CLANG
-        asm("rdrandw %0;\n\t" "setc %1" :"=a"(un.i.rando2),"=qm"(err) : :);
-#endif
-    } while (err == 0);
+    GETRAND(pre_rand);
+    un.i.rando1 = pre_rand;
+    GETRAND(pre_rand);
+    un.i.rando2 = pre_rand;
 
     return un.rando;
 }
+
 #endif
 
+/* **********************
+ *
+ *  RDSEED code
+ *
+   ********************** */
+
+
 #if IS64BIT
+
+#define GETSEED(rando) asm volatile("1:\n"                    \
+                                    "rdseedq %0\n"            \
+                                    "jnc 1b\n"                \
+                                    :"=a"(rando) : : "cc")
+
+
+// read random bytes into supplied buffer
+// len is in 64 bit words, not bytes
+void
+fill_buf_using_rdseed(uint64_t *buf, uint32_t buf_len)
+{
+    unsigned long int rando = 0;
+
+    for (uint32_t i = 0; i < buf_len; i++)
+    {
+        GETSEED(rando);
+        buf[i] = rando;
+    }
+}
+
 //utility to return 64 random bits from RdSeed
 uint64_t
 get_bits_using_rdseed(void)
 {
     unsigned long int rando = 0;
-    unsigned char err = 0;
-
-    // Yes, this is inline assembly.
-    // should never really fail, may have
-    // to reexamine for future versions
-    do
-    {
-#if USING_GCC
-        asm volatile(".byte 0x48; .byte 0x0f; .byte 0xc7; .byte 0xf8; setc %1":"=a"(rando), "=qm"(err));
-
-#elif USING_CLANG
-        asm("rdseedq %0;\n\t" "setc %1" :"=a"(rando),"=qm"(err) : :);
-#endif
-
-    } while (err == 0);
-
+    GETSEED(rando);
     return rando;
 }
 #elif IS32BIT
+
+#define GETSEED(rando) asm volatile("1:\n"                    \
+                                    "rdseed %0\n"            \
+                                    "jnc 1b\n"                \
+                                    :"=a"(rando) : : "cc")
+
 uint64_t
 get_bits_using_rdseed(void)
 {
-    unsigned char err = 0;
+    unsigned int prerand;
     union{
        uint64_t rando;
        struct {
@@ -255,35 +315,36 @@ get_bits_using_rdseed(void)
        } i;
     } un;
 
-    // Yes, this is inline assembly.
-    // should never really fail, may have
-    // to reexamine for future versions
-    do
-    {
-#if USING_GCC
-        asm volatile(".byte 0x0f; .byte 0xc7; .byte 0xf8; setc %1":"=a"(un.i.rando1), "=qm"(err));
-#elif USING_CLANG
-        asm("rdseedw %0;\n\t" "setc %1" :"=a"(un.i.rando1),"=qm"(err) : :);
-#endif
-    } while (err == 0);
+    GETSEED(prerand);
+    un.i.rando1 = prerand;
 
-    do
-    {
-#if USING_GCC
-        asm volatile(".byte 0x0f; .byte 0xc7; .byte 0xf8; setc %1":"=a"(un.i.rando2), "=qm"(err));
-#elif USING_CLANG
-        asm("rdseedw %0;\n\t" "setc %1" :"=a"(un.i.rando2),"=qm"(err) : :);
-#endif
-    } while (err == 0);
+    GETSEED(prerand);
+    un.i.rando2 = prerand;
 
     return un.rando;
 }
+
+void
+fill_buf_using_rdseed(uint64_t *buf, uint32_t buf_len)
+{
+    for (uint32_t i = 0; i < buf_len; i++)
+    {
+        buf[i] = get_bits_using_rdseed();
+    }
+}
+
 #endif
 
+/* **********************
+ *
+ *  General python code
+ *
+   ********************** */
+
 static PyObject *
-rdrand_get_bits(PyObject *self, PyObject *args)
+get_bits(PyObject *self, PyObject *args, uint64_t quad(void), void fill(uint64_t *, uint32_t))
 {
-    int num_bits, num_bytes, i;
+    int num_bits, num_bytes;
     int num_quads, num_chars;
     unsigned char * data = NULL;
     uint64_t rando;
@@ -316,15 +377,20 @@ rdrand_get_bits(PyObject *self, PyObject *args)
         return NULL;
     }
 
-    for(i = 0; i < num_quads; i++)
-    {
-        rando = get_bits_using_rdrand();
-        bcopy((char*)&rando, &data[i * 8], 8);
-    }
+
+    if (num_quads < 4) {
+        for (int i = 0; i < num_quads; i++) {
+            rando = quad();
+            bcopy((char *) &rando, &data[i * 8], 8);
+        }
+    } else
+        fill((uint64_t *)data, num_quads);
+
+
 
     if(num_chars)
     {
-        rando = get_bits_using_rdrand();
+        rando = quad();
         bcopy((char*)&rando, &data[num_quads * 8], num_chars);
     }
 
@@ -335,71 +401,26 @@ rdrand_get_bits(PyObject *self, PyObject *args)
     result = _PyLong_FromByteArray(data, num_bytes, 1, 0);
     PyMem_Free(data);
     return result;
+}
+static PyObject *
+rdrand_get_bits(PyObject *self, PyObject *args)
+{
+    return get_bits(self, args, get_bits_using_rdrand, fill_buf_using_rdrand);
 }
 
 static PyObject *
 rdseed_get_bits(PyObject *self, PyObject *args)
 {
-    int num_bits, num_bytes, i;
-    int num_quads, num_chars;
-    unsigned char * data = NULL;
-    uint64_t rando;
-    unsigned char last_mask, lm_shift;
-    PyObject *result;
-
-    if ( !PyArg_ParseTuple(args, "i", &num_bits) )
-        return NULL;
-
-    if (num_bits <= 0)
-    {
-        PyErr_SetString(PyExc_ValueError, "number of bits must be greater than zero");
-        return NULL;
-    }
-
-    num_bytes   = num_bits / 8;
-    lm_shift    = num_bits % 8;
-    last_mask   = 0xff >> (8 - lm_shift);
-
-    if (lm_shift)
-        num_bytes++;
-
-    num_quads   = num_bytes / 8;
-    num_chars   = num_bytes % 8;
-    data        = (unsigned char *)PyMem_Malloc(num_bytes);
-
-    if (data == NULL)
-    {
-        PyErr_NoMemory();
-        return NULL;
-    }
-
-    for(i = 0; i < num_quads; i++)
-    {
-        rando = get_bits_using_rdseed();
-        bcopy((char*)&rando, &data[i * 8], 8);
-    }
-
-    if(num_chars)
-    {
-        rando = get_bits_using_rdseed();
-        bcopy((char*)&rando, &data[num_quads * 8], num_chars);
-    }
-
-    if (lm_shift != 0)
-        data[num_bytes -1] &= last_mask;
-
-    /* Probably hosing byte order. big deal it's hardware random, has no meaning til we assign it */
-    result = _PyLong_FromByteArray(data, num_bytes, 1, 0);
-    PyMem_Free(data);
-    return result;
+    return get_bits(self, args, get_bits_using_rdseed, fill_buf_using_rdseed);
 }
+
 static PyObject *
-rdrand_get_bytes(PyObject *self, PyObject *args)
+get_bytes(PyObject *self, PyObject *args, void fill(uint64_t *, uint32_t))
 {
-    int num_bytes, i;
-    int num_quads, num_chars;
+    int num_bytes, num_quads, num_chars, nq;
     unsigned char * data = NULL;
-    uint64_t rando;
+    unsigned char * raw_data = NULL;
+    uint64_t * udata;
     PyObject *result;
 
     if ( !PyArg_ParseTuple(args, "i", &num_bytes) )
@@ -411,9 +432,17 @@ rdrand_get_bytes(PyObject *self, PyObject *args)
         return NULL;
     }
 
-    data        = (unsigned char *)PyMem_Malloc(num_bytes);
     num_quads   = num_bytes / 8;
     num_chars   = num_bytes % 8;
+    nq          = num_quads;
+    if (num_chars != 0)
+        nq++;
+
+    raw_data  = (unsigned char *)PyMem_Malloc((nq+1) * 8);
+
+    //guarantee alignment???
+    data = (unsigned char *)(((uintptr_t)raw_data | 0x7) + 1);
+    udata = (uint64_t *)data;
 
     if (data == NULL)
     {
@@ -421,17 +450,7 @@ rdrand_get_bytes(PyObject *self, PyObject *args)
         return NULL;
     }
 
-    for(i = 0; i < num_quads; i++)
-    {
-        rando = get_bits_using_rdrand();
-        bcopy((char*)&rando, &data[i * 8], 8);
-    }
-
-    if(num_chars)
-    {
-        rando = get_bits_using_rdrand();
-        bcopy((char*)&rando, &data[num_quads * 8], num_chars);
-    }
+    fill_buf_using_rdrand(udata, nq);
 
     /* Probably hosing byte order. big deal it's hardware random, has no meaning til we assign it */
 #if PYTHON2 == 1
@@ -439,60 +458,22 @@ rdrand_get_bytes(PyObject *self, PyObject *args)
 #else
     result = Py_BuildValue("y#", data, num_bytes);
 #endif
-    PyMem_Free(data);
+    PyMem_Free(raw_data);
     return result;
 }
 
+static PyObject *
+rdrand_get_bytes(PyObject *self, PyObject *args)
+{
+    return get_bytes(self, args, fill_buf_using_rdrand);
+}
 
 static PyObject *
 rdseed_get_bytes(PyObject *self, PyObject *args)
 {
-    int num_bytes, i;
-    int num_quads, num_chars;
-    unsigned char * data = NULL;
-    uint64_t rando;
-    PyObject *result;
-
-    if ( !PyArg_ParseTuple(args, "i", &num_bytes) )
-        return NULL;
-
-    if (num_bytes <= 0)
-    {
-        PyErr_SetString(PyExc_ValueError, "number of bytes must be greater than zero");
-        return NULL;
-    }
-
-    data        = (unsigned char *)PyMem_Malloc(num_bytes);
-    num_quads   = num_bytes / 8;
-    num_chars   = num_bytes % 8;
-
-    if (data == NULL)
-    {
-        PyErr_NoMemory();
-        return NULL;
-    }
-
-    for(i = 0; i < num_quads; i++)
-    {
-        rando = get_bits_using_rdseed();
-        bcopy((char*)&rando, &data[i * 8], 8);
-    }
-
-    if(num_chars)
-    {
-        rando = get_bits_using_rdseed();
-        bcopy((char*)&rando, &data[num_quads * 8], num_chars);
-    }
-
-    /* Probably hosing byte order. big deal it's hardware random, has no meaning til we assign it */
-#if PYTHON2 == 1
-    result = Py_BuildValue("s#", data, num_bytes);
-#else
-    result = Py_BuildValue("y#", data, num_bytes);
-#endif
-    PyMem_Free(data);
-    return result;
+    return get_bytes(self, args, fill_buf_using_rdrand);
 }
+
 static PyMethodDef rdrand_functions[] = {
         {"rdrand_get_bits",       rdrand_get_bits,        METH_VARARGS, "rdrand_get_bits()"},
         {"rdrand_get_bytes",      rdrand_get_bytes,       METH_VARARGS, "rdrand_get_bytes()"},
@@ -525,7 +506,9 @@ init_rdrand(void)
         PyModule_AddIntConstant(m, "HAS_SEED", has_seed);
 }
 #else
-static struct PyModuleDef rdrandmodule = {
+
+static struct PyModuleDef rdrandmodule =
+{
    PyModuleDef_HEAD_INIT, "_rdrand", module_doc, -1, rdrand_functions
 };
 
