@@ -39,7 +39,6 @@
 #define IS32BIT 1
 #endif
 
-
 // Willing to support other compilers, if you can get me access to them, and they
 // build python
 #ifdef __GNUC__
@@ -67,14 +66,11 @@ int RdSeed_cpuid(void);
 
 PyDoc_STRVAR(module_doc, "rdrand: Python interface to Intel and AMD hardware RNG\n");
 
-
-
 /* **********************
  *
  *  CHECK CPU
  *
    ********************** */
-
 
 /*! \brief Queries cpuid to see if rdrand is supported
  *
@@ -143,7 +139,6 @@ RdRand_cpuid(void)
         return 0;
 }
 
-
 int
 RdSeed_cpuid(void)
 {
@@ -170,12 +165,11 @@ RdSeed_cpuid(void)
         return info[1];
 }
 
-
-/* **********************
- *
- *  RDRAND code
- *
-   ********************** */
+/************************
+ *                      *
+ *     RDRAND code      *
+ *                      *
+ ************************/
 
 #if IS64BIT
 
@@ -259,12 +253,11 @@ get_bits_using_rdrand(void)
 
 #endif
 
-/* **********************
- *
- *  RDSEED code
- *
-   ********************** */
-
+/************************
+ *                      *
+ *      RDSEED code     *
+ *                      *
+ ************************/
 
 #if IS64BIT
 
@@ -335,11 +328,11 @@ fill_buf_using_rdseed(uint64_t *buf, uint32_t buf_len)
 
 #endif
 
-/* **********************
- *
- *  General python code
- *
-   ********************** */
+/************************
+ *                      *
+ *  General python code *
+ *                      *
+ ************************/
 
 static PyObject *
 get_bits(PyObject *self, PyObject *args, uint64_t quad(void), void fill(uint64_t *, uint32_t))
@@ -377,16 +370,7 @@ get_bits(PyObject *self, PyObject *args, uint64_t quad(void), void fill(uint64_t
         return NULL;
     }
 
-
-    if (num_quads < 4) {
-        for (int i = 0; i < num_quads; i++) {
-            rando = quad();
-            bcopy((char *) &rando, &data[i * 8], 8);
-        }
-    } else
-        fill((uint64_t *)data, num_quads);
-
-
+    fill((uint64_t *)data, num_quads);
 
     if(num_chars)
     {
@@ -440,7 +424,9 @@ get_bytes(PyObject *self, PyObject *args, void fill(uint64_t *, uint32_t))
 
     raw_data  = (unsigned char *)PyMem_Malloc((nq+1) * 8);
 
-    //guarantee alignment???
+    // guarantee alignment
+    // we over allocate space, then move forward to the next
+    // 64 bit aligned address
     data = (unsigned char *)(((uintptr_t)raw_data | 0x7) + 1);
     udata = (uint64_t *)data;
 
@@ -450,9 +436,9 @@ get_bytes(PyObject *self, PyObject *args, void fill(uint64_t *, uint32_t))
         return NULL;
     }
 
+    // Let python truncate it to the correct length
     fill_buf_using_rdrand(udata, nq);
 
-    /* Probably hosing byte order. big deal it's hardware random, has no meaning til we assign it */
 #if PYTHON2 == 1
     result = Py_BuildValue("s#", data, num_bytes);
 #else
@@ -471,7 +457,7 @@ rdrand_get_bytes(PyObject *self, PyObject *args)
 static PyObject *
 rdseed_get_bytes(PyObject *self, PyObject *args)
 {
-    return get_bytes(self, args, fill_buf_using_rdrand);
+    return get_bytes(self, args, fill_buf_using_rdseed);
 }
 
 static PyMethodDef rdrand_functions[] = {
