@@ -21,4 +21,10 @@ setup(name='rdrand',
         "Programming Language :: Python :: 3",
         "Topic :: Security",
         "Topic :: Security :: Cryptography",],
+    extras_require={
+        'tests': [],
+        'docs': [
+            'sphinx >= 1.4',
+            'sphinx_rtd_theme']}
 )
+

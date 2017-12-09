@@ -1,4 +1,8 @@
 type: sphinx
 python:
-  version: "3.5"
-  pip_install: true
+  version: "2.7"
+  pip_install: True
+formats:
+  -htmlzip
+  -pdf
+  -epub
