@@ -1,7 +1,7 @@
 from distutils.core import setup, Extension
 
 setup(name='rdrand',
-      version='1.0.1',
+      version='1.4.9',
       description="Python interface to Intel hardware rng",
       long_description= "".join(open('rdrandom.rst').readlines()),
       author="Chris Stillson",
@@ -10,7 +10,7 @@ setup(name='rdrand',
       license="New BSD license",
       ext_modules=[Extension('_rdrand', ['rdrand.c'])],
       py_modules = ['rdrand'],
-      keywords = ["intel","hardware","random","number","generator","rng"],
+      keywords = ['rdrand', 'rdseed', "intel","hardware","random","number","generator","rng"],
       data_files=[('share', ['rdrandom.rst'])],
       classifiers = ["Development Status :: 4 - Beta",
         "Intended Audience :: Developers",

@@ -174,7 +174,7 @@ RdSeed_cpuid(void)
 #if IS64BIT
 
 #define GETRAND(rando) asm volatile("1:\n"                    \
-                                    "rdrandq %0\n"            \
+                                    "rdrand  %0\n"            \
                                     "jnc 1b\n"                \
                                     :"=a"(rando) : : "cc")
 
@@ -262,7 +262,7 @@ get_bits_using_rdrand(void)
 #if IS64BIT
 
 #define GETSEED(rando) asm volatile("1:\n"                    \
-                                    "rdseedq %0\n"            \
+                                    "rdseed  %0\n"            \
                                     "jnc 1b\n"                \
                                     :"=a"(rando) : : "cc")
 
