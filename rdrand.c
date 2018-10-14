@@ -162,7 +162,7 @@ RdSeed_cpuid(void)
     if ((ebx & RDSEED_MASK) == RDSEED_MASK)
         return 1;
     else
-        return info[1];
+        return 0;
 }
 
 /************************
